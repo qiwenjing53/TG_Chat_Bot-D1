@@ -52,41 +52,34 @@
 
 5.  点击 **D1的控制台界面，有一个执行步骤，将下面三段执行语句复制到执行窗口，点击执行即可，会弹出响应时间即为部署成功**：
 
-    | 表名 | 字段 (Schema) |
-    | :--- | :--- |
-    | `users` | `user_id` (TEXT, PRIMARY KEY), `topic_id` (TEXT), `user_state` (TEXT), `is_blocked` (INTEGER), `block_count` (INTEGER), `user_info_json` (TEXT) |
-    | `config` | `key` (TEXT, PRIMARY KEY), `value` (TEXT) |
-    | `messages` | `user_id` (TEXT), `message_id` (TEXT), `text` (TEXT), `date` (INTEGER), PRIMARY KEY (`user_id`, `message_id`) |
-
--- ① users 表
-
+-- ① users 表 (已修正：添加 first_message_sent 及默认值)
 CREATE TABLE IF NOT EXISTS users (
-    user_id TEXT PRIMARY KEY,
+    user_id TEXT PRIMARY KEY NOT NULL,
+    user_state TEXT NOT NULL DEFAULT 'new',
+    is_blocked INTEGER NOT NULL DEFAULT 0,
+    block_count INTEGER NOT NULL DEFAULT 0,
+    first_message_sent INTEGER NOT NULL DEFAULT 0,
     topic_id TEXT,
-    user_state TEXT,
-    is_blocked INTEGER,
-    block_count INTEGER,
-    user_info_json TEXT
+    user_info_json TEXT 
 );
 
 -- ② config 表
-
 CREATE TABLE IF NOT EXISTS config (
     key TEXT PRIMARY KEY,
     value TEXT
 );
 
 -- ③ messages 表
-
 CREATE TABLE IF NOT EXISTS messages (
-    user_id TEXT,
-    message_id TEXT,
+    user_id TEXT NOT NULL,
+    message_id TEXT NOT NULL,
     text TEXT,
     date INTEGER,
     PRIMARY KEY (user_id, message_id)
 );
 
-如果表格不太好理解，可以分别复制这三段表格的代码内容
+PS：针对已经部署失败的用户（修复方案）
+ALTER TABLE users ADD COLUMN first_message_sent INTEGER NOT NULL DEFAULT 0;
 
 ### 步骤二：创建 Worker 服务并部署代码
 
