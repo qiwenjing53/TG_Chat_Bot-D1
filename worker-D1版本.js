@@ -13,14 +13,13 @@
  * - WORKER_URL: Worker 的完整 URL (例如 https://my-worker.example.workers.dev)
  * - TURNSTILE_SITE_KEY: Cloudflare Turnstile 站点密钥
  * - TURNSTILE_SECRET_KEY: Cloudflare Turnstile 密钥
+ * * * [更新日志 - 回执控制]
+ * - 在“过滤与系统功能”菜单中增加了“管理员回复回执”开关。
+ * - 管理员现在可以关闭回复用户时的自动确认消息。
  */
 
 
 // --- 辅助函数 (D1 数据库抽象层) ---
-// [此部分代码与您提供的版本完全相同，此处折叠以节省空间]
-// ... (dbConfigGet, dbConfigPut, dbUserGetOrCreate, dbUserUpdate, ...)
-// ... (dbTopicUserGet, dbMessageDataPut, dbMessageDataGet, ...)
-// ... (dbAdminStateDelete, dbAdminStateGet, dbAdminStatePut, dbMigrate)
 
 /**
  * [D1 Abstraction] 获取全局配置 (config table)
@@ -205,10 +204,6 @@ async function dbMigrate(env) {
 
 
 // --- 辅助函数 ---
-// [此部分代码与您提供的版本完全相同，此处折叠以节省空间]
-// ... (escapeHtml, getUserInfo, getInfoCardButtons, getConfig, ...)
-// ... (isPrimaryAdmin, getAuthorizedAdmins, isAdminUser, ...)
-// ... (getAutoReplyRules, getBlockKeywords, telegramApi)
 
 function escapeHtml(text) {
   if (!text) return '';
@@ -1041,12 +1036,6 @@ async function handleVerification(chatId, answer, env) {
 }
 
 // --- 管理员配置主菜单逻辑 (使用 D1) ---
-// [此部分代码与您提供的版本完全相同，此处折叠以节省空间]
-// ... (handleAdminConfigStart, handleAdminBaseConfigMenu, handleAdminAuthorizedConfigMenu, ...)
-// ... (handleAdminAutoReplyMenu, handleAdminKeywordBlockMenu, handleAdminBackupConfigMenu, ...)
-// ... (handleAdminRuleList, handleAdminRuleDelete, handleAdminTypeBlockMenu, handleAdminConfigInput, ...)
-// ... (handleRelayToTopic, handleRelayEditedMessage, handlePinCard, ...)
-// ... (handleCallbackQuery, handleBlockUser, handleUnblockUser, handleAdminReply)
 
 async function handleAdminConfigStart(chatId, env) {
     const isPrimary = isPrimaryAdmin(chatId, env);
@@ -1069,8 +1058,8 @@ async function handleAdminConfigStart(chatId, env) {
             // 第二行：功能
             [{ text: "🤖 自动回复管理", callback_data: "config:menu:autoreply" }],
             [{ text: "🚫 关键词屏蔽管理", callback_data: "config:menu:keyword" }],
-            // 第三行：过滤
-            [{ text: "🔗 按类型过滤管理", callback_data: "config:menu:filter" }],
+            // 第三行：过滤与系统设置 (修改了名称)
+            [{ text: "🛠 过滤与系统功能", callback_data: "config:menu:filter" }],
             // 协管员授权设置按钮
             [{ text: "🧑‍💻 协管员授权设置", callback_data: "config:menu:authorized" }], 
             // 备份群组设置按钮
@@ -1426,7 +1415,7 @@ async function handleAdminRuleDelete(chatId, messageId, env, key, id) {
 
 
 /**
- * 按类型过滤子菜单 - 兼容编辑和发送新消息
+ * [修改] 按类型过滤与系统设置子菜单 - 兼容编辑和发送新消息
  */
 async function handleAdminTypeBlockMenu(chatId, messageId, env) {
     // 获取当前状态，检查 D1 -> ENV -> 默认值 'true'
@@ -1439,15 +1428,24 @@ async function handleAdminTypeBlockMenu(chatId, messageId, env) {
     const audioVoiceStatus = (await getConfig('enable_audio_forwarding', env, 'true')).toLowerCase() === 'true'; // 音频/语音
     const stickerGifStatus = (await getConfig('enable_sticker_forwarding', env, 'true')).toLowerCase() === 'true'; // 贴纸/GIF
 
-    const statusToText = (status) => status ? "✅ 允许" : "❌ 屏蔽";
+    // [新增] 管理员回复回执开关
+    const adminReceiptStatus = (await getConfig('enable_admin_receipt', env, 'true')).toLowerCase() === 'true';
+
+    const statusToText = (status) => status ? "✅ 允许/开启" : "❌ 屏蔽/关闭";
     // 构造回调数据：config:toggle:key:new_value (e.g., config:toggle:enable_image_forwarding:false)
     const statusToCallback = (key, status) => `config:toggle:${key}:${status ? 'false' : 'true'}`;
 
     const menuText = `
-🔗 <b>按类型过滤管理</b>
+🛠 <b>过滤与系统功能设置</b>
 
-点击按钮切换转发状态 (切换后立即生效)。
+点击按钮切换状态 (切换后立即生效)。
 
+<b>系统功能:</b>
+| 功能 | 状态 |
+| :--- | :--- |
+| 管理员回复回执 | ${statusToText(adminReceiptStatus)} |
+
+<b>消息转发过滤:</b>
 | 类型 | 状态 |
 | :--- | :--- |
 | <b>转发消息（用户/群组/频道）</b>| ${statusToText(anyForwardStatus)} |
@@ -1461,6 +1459,9 @@ async function handleAdminTypeBlockMenu(chatId, messageId, env) {
 
     const menuKeyboard = {
         inline_keyboard: [
+            // [新增] 系统功能
+            [{ text: `管理员回复回执: ${statusToText(adminReceiptStatus)}`, callback_data: statusToCallback('enable_admin_receipt', adminReceiptStatus) }],
+            
             // 新增的过滤类型
             [{ text: `转发消息 (用户/群组/频道): ${statusToText(anyForwardStatus)}`, callback_data: statusToCallback('enable_forward_forwarding', anyForwardStatus) }],
             [{ text: `音频/语音消息 (Audio/Voice): ${statusToText(audioVoiceStatus)}`, callback_data: statusToCallback('enable_audio_forwarding', audioVoiceStatus) }],
@@ -2298,26 +2299,31 @@ async function handleAdminReply(message, env) {
         }
     }
     
-    // --- 向管理员发送带可点击用户名的回执 ---
-    // 首先获取完整的用户信息
-    const userData = await dbUserGetOrCreate(userId, env);
-    let confirmationDetail;
+    // --- 向管理员发送带可点击用户名的回执 (增加开关控制) ---
+    // [NEW] 检查配置是否允许发送回执
+    const enableAdminReceipt = (await getConfig('enable_admin_receipt', env, 'true')).toLowerCase() === 'true';
 
-    // 判断用户是否有用户名，构建不同的回执详情
-    if (userData.user_info && userData.user_info.username && userData.user_info.username !== '无') {
-        const safeUsername = escapeHtml(userData.user_info.username);
-        confirmationDetail = `用户名: <a href="tg://user?id=${userId}">${safeUsername}</a>`;
-    } else {
-        // 如果没有用户名，回退到显示ID
-        confirmationDetail = `ID: <code>${userId}</code>`;
+    if (enableAdminReceipt) {
+        // 首先获取完整的用户信息
+        const userData = await dbUserGetOrCreate(userId, env);
+        let confirmationDetail;
+
+        // 判断用户是否有用户名，构建不同的回执详情
+        if (userData.user_info && userData.user_info.username && userData.user_info.username !== '无') {
+            const safeUsername = escapeHtml(userData.user_info.username);
+            confirmationDetail = `用户名: <a href="tg://user?id=${userId}">${safeUsername}</a>`;
+        } else {
+            // 如果没有用户名，回退到显示ID
+            confirmationDetail = `ID: <code>${userId}</code>`;
+        }
+
+        await telegramApi(env.BOT_TOKEN, "sendMessage", {
+            chat_id: message.chat.id,
+            message_thread_id: message.message_thread_id,
+            text: `✅ 回复已发送给用户 (${confirmationDetail})`,
+            parse_mode: "HTML",
+            reply_to_message_id: message.message_id,
+            disable_notification: true,
+        }).catch(e => console.error("发送管理员回执失败:", e.message)); // 忽略发送失败
     }
-
-    await telegramApi(env.BOT_TOKEN, "sendMessage", {
-        chat_id: message.chat.id,
-        message_thread_id: message.message_thread_id,
-        text: `✅ 回复已发送给用户 (${confirmationDetail})`,
-        parse_mode: "HTML",
-        reply_to_message_id: message.message_id,
-        disable_notification: true,
-    }).catch(e => console.error("发送管理员回执失败:", e.message)); // 忽略发送失败
 }
