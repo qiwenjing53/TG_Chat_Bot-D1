@@ -1,6 +1,6 @@
 /**
- * Telegram Bot Worker v3.29 (Self-Healing Edition)
- * 修复: 话题删除导致死锁 | 优化: 深度自愈/黑名单重建/全链路闭环
+ * Telegram Bot Worker v3.30 (Unrestricted Edition)
+ * 修复: 话题删除导致死锁 | 优化: 深度自愈/黑名单重建/全链路闭环 | 变更: 解除首次文本限制
  */
 
 // --- 1. 静态配置 ---
@@ -32,7 +32,7 @@ export default {
         const url = new URL(req.url);
         if (req.method === "GET") {
             if (url.pathname === "/verify") return handleVerifyPage(url, env);
-            if (url.pathname === "/") return new Response("Bot v3.29 Active", { status: 200 });
+            if (url.pathname === "/") return new Response("Bot v3.30 Active", { status: 200 });
         }
         if (req.method === "POST") {
             if (url.pathname === "/submit_token") return handleTokenSubmit(req, env);
@@ -181,7 +181,7 @@ async function sendStart(id, msg, env) {
 
 async function handleVerifiedMsg(msg, u, env) {
     const id = u.user_id, text = msg.text || "";
-    if (!u.first_message_sent && (!text || msg.photo || msg.video)) return api(env.BOT_TOKEN, "sendMessage", { chat_id: id, text: "⚠️ 首次需发送纯文本" });
+    // 已移除首次发送必须为文本的限制
 
     if (text) {
         const kws = await getJsonCfg('block_keywords', env);
