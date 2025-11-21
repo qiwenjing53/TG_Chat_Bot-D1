@@ -3,7 +3,7 @@
  * 基于原版修改: 替换 Turnstile 为 Google reCAPTCHA V2
  * 包含: CRM、黑名单同步、聚合收件箱、One Card Policy
  *在 Cloudflare Worker 的 设置 -> 变量 中，请务必更新以下变量：
- * | 变量名称               |说明                               |
+ * | 变量名称              |说明                               |
  * |-----------------------|-----------------------------------|
  * | RECAPTCHA_SITE_KEY    | Google reCAPTCHA V2 的 Site Key   |
  * | RECAPTCHA_SECRET_KEY  | Google reCAPTCHA V2 的 Secret Key |
